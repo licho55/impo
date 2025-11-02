@@ -1,4 +1,4 @@
-// Config Firebase (global)
+// Config Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyAlj1iNqWqtI8j9KXWsrLMpk4NBpHV6KjI",
   authDomain: "impostor-681a4.firebaseapp.com",
@@ -11,7 +11,7 @@ const firebaseConfig = {
 };
 
 // Inicializar Firebase
-const app = firebase.initializeApp(firebaseConfig);
+firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 // Variables
@@ -41,6 +41,7 @@ const resultText = document.getElementById("resultText");
 
 // Crear sala
 document.getElementById("createRoom").onclick = function() {
+  console.log("Botón crear sala presionado");
   playerName = document.getElementById("playerName").value.trim();
   if(!playerName) return alert("Poné tu nombre");
   roomCode = Math.random().toString(36).substring(2,6).toUpperCase();
@@ -172,3 +173,4 @@ firebase.database().ref("rooms/"+roomCode+"/votes").on("value", snap=>{
     }
   });
 });
+
