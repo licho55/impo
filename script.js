@@ -1,26 +1,25 @@
 // Config Firebase
 // ¡¡¡ RECUERDA USAR TU PROPIA CONFIGURACIÓN DE FIREBASE!!!
- const firebaseConfig = {
-    apiKey: "AIzaSyAlj1iNqWqtI8j9KXWsrLMpk4NBpHV6KjI",
-    authDomain: "impostor-681a4.firebaseapp.com",
-    databaseURL: "https://impostor-681a4-default-rtdb.firebaseio.com",
-    projectId: "impostor-681a4",
-    storageBucket: "impostor-681a4.firebasestorage.app",
-    messagingSenderId: "190634294699",
-    appId: "1:190634294699:web:f07b18db1e01231b2f26ee",
-    measurementId: "G-S02DGT01CQ"
-  };
-
+const firebaseConfig = {
+  apiKey: "TU_API_KEY",
+  authDomain: "TU_AUTH_DOMAIN",
+  databaseURL: "TU_DATABASE_URL",
+  projectId: "TU_PROJECT_ID",
+  storageBucket: "TU_STORAGE_BUCKET",
+  messagingSenderId: "TU_MESSAGING_SENDER_ID",
+  appId: "TU_APP_ID"
+};
 
 // Inicializar Firebase
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// Variables
+// Variables globales
 let playerName = "";
 let roomCode = "";
 let isHost = false;
 let myId = Math.random().toString(36).substring(2, 8);
+let roomRef = null; // Referencia a la sala en la DB
 const words = ["Pizza", "Playa", "Cine", "Escuela", "Hospital", "Helado", "Fútbol"];
 
 // DOM
@@ -38,11 +37,10 @@ const voteDiv = document.getElementById("vote");
 const voteButtons = document.getElementById("voteButtons");
 const resultDiv = document.getElementById("result");
 const resultText = document.getElementById("resultText");
-
-// --- Nuevos elementos del DOM ---
 const eliminatedDiv = document.getElementById("eliminated");
 const remainingPlayersList = document.getElementById("remainingPlayersList");
 const roundSummary = document.getElementById("roundSummary");
+const voteStatus = document.getElementById("voteStatus"); // Div para el recuento
 
 // --- Funciones del Menú (Crear y Unirse) ---
 
@@ -52,11 +50,11 @@ document.getElementById("createRoom").onclick = function() {
   roomCode = Math.random().toString(36).substring(2, 6).toUpperCase();
   isHost = true;
 
-  firebase.database().ref("rooms/" + roomCode).set({
-    players: { [myId]: playerName }, // Lista de TODOS los que entraron
+  roomRef = db.ref("rooms/" + roomCode);
+  roomRef.set({
+    players: { [myId]: playerName },
     host: myId,
-    started: false,
-    votes: {}
+    started: false
   });
 
   joinLobby();
@@ -67,14 +65,13 @@ document.getElementById("joinRoom").onclick = function() {
   roomCode = document.getElementById("roomCodeInput").value.trim().toUpperCase();
   if (!playerName || !roomCode) return alert("Completá los campos");
 
-  firebase.database().ref("rooms/" + roomCode).once("value", (snapshot) => {
+  roomRef = db.ref("rooms/" + roomCode);
+  roomRef.once("value", (snapshot) => {
     if (snapshot.exists()) {
       if(snapshot.val().started) {
         return alert("La partida ya ha comenzado.");
       }
-      firebase.database().ref("rooms/" + roomCode + "/players").update({
-        [myId]: playerName
-      });
+      roomRef.child("players").update({ [myId]: playerName });
       joinLobby();
     } else {
       alert("La sala no existe.");
@@ -86,85 +83,157 @@ document.getElementById("joinRoom").onclick = function() {
 
 function joinLobby() {
   menu.classList.add("hidden");
-  lobby.classList.remove("hidden");
-  roomDisplay.textContent = roomCode;
+  
+  // Conectarse al listener principal del juego
+  // ¡Esta es la única función .on() que usaremos!
+  roomRef.on("value", mainGameListener);
 
-  // Listener 1: Actualizar lista de jugadores en el lobby
-  firebase.database().ref("rooms/" + roomCode + "/players").on("value", snap => {
+  // Manejar desconexión
+  const myPlayerRef = roomRef.child("players").child(myId);
+  myPlayerRef.onDisconnect().remove();
+  const myAliveRef = roomRef.child("alivePlayers").child(myId);
+  myAliveRef.onDisconnect().remove();
+
+  if (isHost) {
+    // Si el host se va, se borra toda la sala
+    roomRef.onDisconnect().remove();
+  }
+}
+
+// --- EL LISTENER PRINCIPAL (Máquina de Estados) ---
+
+function mainGameListener(snapshot) {
+  const data = snapshot.val();
+
+  // 1. Si la sala no existe (host la cerró), volver al menú.
+  if (!data) {
+    alert("La sala fue cerrada.");
+    location.reload();
+    return;
+  }
+
+  // 2. Si el juego terminó (hay un resultText), mostrar resultado final.
+  if (data.resultText) {
+    showScreen("result");
+    resultText.textContent = data.resultText;
+    roomRef.off(); // Desconectar el listener
+    return;
+  }
+
+  // 3. Si no estoy vivo (fui eliminado), mostrar pantalla de eliminado.
+  if (data.started && data.alivePlayers && !data.alivePlayers[myId]) {
+    showScreen("eliminated");
+    remainingPlayersList.innerHTML = "";
+    for (const id in data.alivePlayers) {
+        const li = document.createElement("li");
+        li.textContent = data.players[id];
+        remainingPlayersList.appendChild(li);
+    }
+    return;
+  }
+
+  // 4. Si el juego no ha empezado, mostrar Lobby.
+  if (!data.started) {
+    showScreen("lobby");
+    roomDisplay.textContent = roomCode;
     playerList.innerHTML = "";
-    const players = snap.val() || {};
+    const players = data.players || {};
     for (const id in players) {
       const li = document.createElement("li");
       li.textContent = players[id];
       if (id === myId) li.textContent += " (Tú)";
       playerList.appendChild(li);
     }
-  });
+    // Mostrar botón de start solo al host
+    startBtn.className = isHost ? "btn-primary" : "btn-primary hidden";
+    waitingText.className = isHost ? "hidden" : "";
+    return;
+  }
 
-  // Listener 2: Escuchar cambios de estado de la sala (inicio, eliminación, etc.)
-  firebase.database().ref("rooms/" + roomCode).on("value", snap => {
-    const data = snap.val();
-    if (!data) {
-        alert("La sala fue cerrada por el host.");
-        location.reload();
-        return;
+  // 5. Si el juego SÍ ha empezado...
+  
+  // Asignar rol (solo la primera vez)
+  if (playerRole.textContent === "") {
+    if (myId === data.impostor) {
+      playerRole.textContent = "Eres el IMPOSTOR 😈";
+      wordInfo.textContent = "Fingí saber la palabra...";
+    } else {
+      playerRole.textContent = "Eres un ciudadano 🧠";
+      wordInfo.textContent = "La palabra es: "."...".";
     }
+  }
 
-    // Comprobar si HE SIDO ELIMINADO
-    if (data.started && data.alivePlayers && !data.alivePlayers[myId] && resultDiv.classList.contains("hidden")) {
-      showEliminatedScreen(data.alivePlayers);
-    }
+  // 6. Decidir qué pantalla de juego mostrar (Discusión o Votación)
+  if (data.roomState === "voting") {
+    // ESTADO: VOTANDO
+    showScreen("vote");
+    updateVoteUI(data);
+  } else {
+    // ESTADO: DISCUTIENDO (default)
+    showScreen("game");
+    roundSummary.textContent = data.roundSummary || "Discutan la palabra...";
+  }
 
-    // Iniciar la partida por primera vez
-    if (data.started && game.classList.contains("hidden") && !eliminatedDiv.classList.contains("hidden")) {
-      lobby.classList.add("hidden");
-      game.classList.remove("hidden");
-
-      if (myId === data.impostor) {
-        playerRole.textContent = "Eres el IMPOSTOR 😈";
-        wordInfo.textContent = "Fingí saber la palabra...";
-      } else {
-        playerRole.textContent = "Eres un ciudadano 🧠";
-        wordInfo.textContent = "La palabra es: " + data.word;
-      }
-    }
-  });
-
-  // Manejar desconexión
-  const myPlayerRef = firebase.database().ref("rooms/" + roomCode + "/players/" + myId);
-  myPlayerRef.onDisconnect().remove();
-  const myAliveRef = firebase.database().ref("rooms/" + roomCode + "/alivePlayers/" + myId);
-  myAliveRef.onDisconnect().remove();
-
+  // 7. TAREAS DEL HOST: El host comprueba si debe procesar los votos
   if (isHost) {
-    startBtn.classList.remove("hidden");
-    waitingText.classList.add("hidden");
-    // Si el host se va, se borra toda la sala
-    firebase.database().ref("rooms/" + roomCode).onDisconnect().remove();
+    checkHostDuties(data);
   }
 }
 
-// --- PANTALLA DE ELIMINADO ---
-function showEliminatedScreen(alivePlayers) {
-    game.classList.add("hidden");
-    lobby.classList.add("hidden");
-    voteDiv.classList.add("hidden");
-    resultDiv.classList.add("hidden");
-    eliminatedDiv.classList.remove("hidden");
+// --- Funciones de Pantalla ---
 
-    remainingPlayersList.innerHTML = "";
-    for (const id in alivePlayers) {
-        const li = document.createElement("li");
-        li.textContent = alivePlayers[id];
-        remainingPlayersList.appendChild(li);
-    }
+function showScreen(screenId) {
+  // Ocultar todas las pantallas
+  [menu, lobby, game, vote, eliminatedDiv, resultDiv].forEach(div => {
+    div.classList.add("hidden");
+  });
+  // Mostrar solo la deseada
+  document.getElementById(screenId).classList.remove("hidden");
 }
 
+function updateVoteUI(data) {
+  const votes = data.votes || {};
+  const allPlayers = data.players || {};
+  const alivePlayers = data.alivePlayers || {};
 
-// --- Iniciar partida ---
+  // --- 1. Lógica de tu nueva función: Mostrar recuento de votos ---
+  voteStatus.innerHTML = "<h3>Votos en vivo:</h3>";
+  const counts = {};
+  Object.values(votes).forEach(id => { counts[id] = (counts[id] || 0) + 1; });
+  
+  for (const id in alivePlayers) {
+    const name = allPlayers[id];
+    const numVotes = counts[id] || 0;
+    voteStatus.innerHTML += `<p>${name}: ${numVotes} voto(s)</p>`;
+  }
+  voteStatus.innerHTML += `<hr><p>Total: ${Object.keys(votes).length} / ${Object.keys(alivePlayers).length}</p>`;
+
+  // --- 2. Lógica de botones: ¿Ya voté? ---
+  if (votes[myId]) {
+    // Ya voté
+    voteButtons.innerHTML = "<p>Voto enviado ✅. Esperando a los demás...</p>";
+  } else {
+    // No he votado
+    voteButtons.innerHTML = "";
+    for (const id in alivePlayers) {
+      const btn = document.createElement("button");
+      btn.textContent = "Votar a " + alivePlayers[id];
+      btn.onclick = function() {
+        // Enviar mi voto
+        roomRef.child("votes").child(myId).set(id);
+      }
+      voteButtons.appendChild(btn);
+    }
+  }
+}
+
+// --- Funciones de Botones (Acciones) ---
+
 startBtn.onclick = function() {
-  firebase.database().ref("rooms/" + roomCode + "/players").once("value").then(snap => {
-    const players = snap.val();
+  if (!isHost) return;
+
+  roomRef.once("value").then(snap => {
+    const players = snap.val().players;
     const playerKeys = Object.keys(players);
 
     if (playerKeys.length < 3) {
@@ -175,148 +244,116 @@ startBtn.onclick = function() {
     const impostorId = playerKeys[Math.floor(Math.random() * playerKeys.length)];
     const chosenWord = words[Math.floor(Math.random() * words.length)];
 
-    firebase.database().ref("rooms/" + roomCode).update({
+    // Iniciar el juego
+    roomRef.update({
       started: true,
       word: chosenWord,
       impostor: impostorId,
-      alivePlayers: players, // <-- NUEVO: Lista de jugadores vivos
-      votes: {}
+      alivePlayers: players, // Empezamos con todos vivos
+      roomState: "discussing", // Primer estado: Discusión
+      votes: {},
+      roundSummary: "¡Empieza la partida! Discutan sobre la palabra."
     });
   });
 }
 
-// --- Ir a votación ---
 goToVote.onclick = function() {
-  game.classList.add("hidden");
-  voteDiv.classList.remove("hidden");
-  voteButtons.innerHTML = "<p>¿Quién es el impostor?</p>";
-
-  // Solo mostrar botones de jugadores VIVOS
-  firebase.database().ref("rooms/" + roomCode + "/alivePlayers").once("value").then(snap => {
-    const alivePlayers = snap.val();
-    for (const id in alivePlayers) {
-      const btn = document.createElement("button");
-      btn.textContent = "Votar a " + alivePlayers[id];
-      btn.onclick = function() {
-        firebase.database().ref("rooms/" + roomCode + "/votes/" + myId).set(id);
-        voteButtons.innerHTML = "<p>Voto enviado ✅. Esperando a los demás...</p>";
-      }
-      voteButtons.appendChild(btn);
-    }
+  // Cualquiera puede iniciar la votación, pero lo cambia para todos
+  roomRef.update({
+    roomState: "voting", // Cambiar a estado de votación
+    votes: {}, // Limpiar votos
+    roundSummary: ""
   });
 }
 
-// --- LÓGICA DE VOTACIÓN Y RESULTADO (LA MÁS CAMBIADA) ---
-firebase.database().ref("rooms/" + roomCode + "/votes").on("value", snap => {
-  const votes = snap.val();
-  
-  // Si no hay votos (p.ej. se reinició la ronda) o el juego ya terminó, no hacer nada.
-  if (!votes || !resultDiv.classList.contains("hidden")) return;
+// --- Lógica del Host (El "Director" del juego) ---
 
-  // 1. Obtener el estado actual de la sala (quién está vivo, quién es impostor)
-  firebase.database().ref("rooms/" + roomCode).once("value").then(roomSnap => {
-    const roomData = roomSnap.val();
-    if (!roomData || !roomData.started) return; // La partida no ha empezado
+function checkHostDuties(data) {
+  // Solo el host ejecuta esto
+  if (!isHost) return;
 
-    const alivePlayers = roomData.alivePlayers || {};
-    const impostorId = roomData.impostor;
-    const allPlayers = roomData.players || {}; // Nombres de todos
-    
-    const alivePlayerIds = Object.keys(alivePlayers);
-    const totalAlive = alivePlayerIds.length;
+  // Tarea 1: ¿Estamos votando y ya votaron todos?
+  if (data.roomState === "voting") {
+    const votes = data.votes || {};
+    const alivePlayers = data.alivePlayers || {};
     const totalVotes = Object.keys(votes).length;
+    const totalAlive = Object.keys(alivePlayers).length;
 
-    // 2. Esperar a que todos los jugadores VIVOS hayan votado
-    if (totalVotes === totalAlive) {
-      
-      // 3. Contar votos
-      const counts = {};
-      Object.values(votes).forEach(id => counts[id] = (counts[id] || 0) + 1);
-
-      let maxVotes = 0;
-      let tied = false;
-      let kickedId = ""; // ID del jugador a eliminar
-
-      for (const id in counts) {
-        const voteCount = counts[id];
-        if (voteCount > maxVotes) {
-          maxVotes = voteCount;
-          kickedId = id;
-          tied = false; // Se rompió el empate
-        } else if (voteCount === maxVotes) {
-          tied = true; // Hay un empate
-        }
-      }
-      
-      // Si el más votado tiene un empate con otro, nadie es kickeado
-      if (tied) {
-         const tiedPlayers = Object.keys(counts).filter(id => counts[id] === maxVotes);
-         if(tiedPlayers.length > 1) {
-            kickedId = ""; // Es un empate real, nadie es eliminado
-         }
-      }
-
-      // 4. Procesar el resultado de la votación
-      const dbRef = firebase.database().ref("rooms/" + roomCode);
-
-      // --- CASO A: EMPATE O NADIE VOTADO ---
-      if (kickedId === "") {
-        // Nadie es eliminado. El juego vuelve a la discusión.
-        voteDiv.classList.add("hidden");
-        game.classList.remove("hidden");
-        roundSummary.textContent = "¡Hubo un empate! Nadie fue eliminado. Sigan discutiendo.";
-        
-        // Limpiar votos para la siguiente ronda (solo el host)
-        if (isHost) {
-          dbRef.child("votes").set({});
-        }
-        return; // Fin
-      }
-
-      // --- CASO B: ALGUIEN FUE ELIMINADO ---
-      const kickedName = allPlayers[kickedId] || "Alguien";
-      
-      // Eliminar al jugador de la lista de vivos (solo el host lo hace)
-      if (isHost) {
-        dbRef.child("alivePlayers").child(kickedId).remove();
-      }
-
-      // 5. Comprobar condiciones de victoria
-      
-      // --- Condición 1: ¿Era el impostor? ---
-      if (kickedId === impostorId) {
-        // ¡Ganan los inocentes!
-        resultDiv.classList.remove("hidden");
-        voteDiv.classList.add("hidden");
-        game.classList.add("hidden");
-        eliminatedDiv.classList.add("hidden");
-        resultText.textContent = `✅ ¡Atraparon al impostor (${kickedName})! La palabra era ${roomData.word}. ¡Ganaron los ciudadanos!`;
-        return; // Fin del juego
-      }
-
-      // --- Condición 2: No era el impostor. ¿Gana el impostor? ---
-      // El impostor gana si quedan 2 jugadores (él y 1 inocente)
-      const remainingAlive = totalAlive - 1;
-      if (remainingAlive <= 2) {
-        // ¡Gana el impostor!
-        resultDiv.classList.remove("hidden");
-        voteDiv.classList.add("hidden");
-        game.classList.add("hidden");
-        eliminatedDiv.classList.add("hidden");
-        resultText.textContent = `❌ Sacaron a ${kickedName}, pero no era. El impostor (${allPlayers[impostorId]}) ha ganado.`;
-        return; // Fin del juego
-      }
-
-      // --- Condición 3: El juego continúa ---
-      // Volver a la pantalla de juego
-      voteDiv.classList.add("hidden");
-      game.classList.remove("hidden");
-      roundSummary.textContent = `❌ ${kickedName} fue eliminado, pero no era el impostor. ¡La partida sigue!`;
-      
-      // Limpiar votos (solo el host)
-      if (isHost) {
-        dbRef.child("votes").set({});
-      }
+    // Si no hay jugadores vivos o los votos no están completos, no hacer nada
+    if (totalAlive === 0 || totalVotes < totalAlive) {
+      return;
     }
+    
+    // ¡TODOS VOTARON! El host procesa el resultado.
+    processVotes(data);
+  }
+}
+
+function processVotes(data) {
+  // El host es el único que corre esta función
+  if (!isHost) return;
+
+  const { votes, alivePlayers, impostorId, players, word } = data;
+
+  // 1. Contar votos
+  const counts = {};
+  Object.values(votes).forEach(id => { counts[id] = (counts[id] || 0) + 1; });
+
+  let maxVotes = 0;
+  let kickedId = "";
+  let isTie = false;
+
+  for (const id in counts) {
+    const voteCount = counts[id];
+    if (voteCount > maxVotes) {
+      maxVotes = voteCount;
+      kickedId = id;
+      isTie = false; // Se rompió el empate
+    } else if (voteCount === maxVotes) {
+      isTie = true; // Hay un empate
+    }
+  }
+
+  // 2. Determinar resultado
+
+  // --- CASO A: EMPATE (o nadie votó a nadie) ---
+  if (isTie || kickedId === "") {
+    roomRef.update({
+      roomState: "discussing",
+      votes: {},
+      roundSummary: "¡Hubo un empate! Nadie fue eliminado. Sigan discutiendo."
+    });
+    return;
+  }
+
+  // --- CASO B: ALGUIEN FUE ELIMINADO ---
+  const kickedName = players[kickedId];
+  const newAlivePlayers = { ...alivePlayers };
+  delete newAlivePlayers[kickedId]; // Eliminarlo de los vivos
+
+  // 3. Comprobar condiciones de victoria
+
+  // --- Condición 1: ¿Era el impostor? ---
+  if (kickedId === impostorId) {
+    roomRef.update({
+      resultText: `✅ ¡Atraparon al impostor (${kickedName})! La palabra era ${word}. ¡Ganaron los ciudadanos!`
+    });
+    return;
+  }
+
+  // --- Condición 2: No era. ¿Gana el impostor? (Quedan 2 vivos) ---
+  if (Object.keys(newAlivePlayers).length <= 2) {
+    roomRef.update({
+      resultText: `❌ Sacaron a ${kickedName}, pero no era. El impostor (${players[impostorId]}) ha ganado.`
+    });
+    return;
+  }
+
+  // --- Condición 3: El juego continúa ---
+  roomRef.update({
+    roomState: "discussing",
+    votes: {},
+    alivePlayers: newAlivePlayers,
+    roundSummary: `❌ ${kickedName} fue eliminado, pero no era el impostor. ¡La partida sigue!`
   });
-});
+}
