@@ -1,53 +1,152 @@
+/* Importar la fuente Poppins */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+
+/* Reseteo básico y variables de color */
+:root {
+  --bg-dark: #1a1a2e; /* Fondo principal oscuro */
+  --bg-light: #2a2a4e; /* Fondo del contenedor */
+  --primary: #7f5af0;   /* Color primario (violeta) */
+  --primary-dark: #613dc1;
+  --text-light: #e0e0e0; /* Texto principal */
+  --text-muted: #a0a0c0; /* Texto secundario */
+  --border-color: #4a4a7e;
+}
+
 body {
-  background-color: #111;
-  color: #fff;
+  background-color: var(--bg-dark);
+  color: var(--text-light);
   font-family: "Poppins", sans-serif;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
+  display: grid; /* Usamos grid para centrar */
+  place-items: center;
+  min-height: 100vh;
   margin: 0;
+  padding: 15px;
+  box-sizing: border-box;
 }
 
 .container {
   text-align: center;
-  background-color: #222;
-  padding: 30px;
+  background-color: var(--bg-light);
+  padding: 30px 40px;
   border-radius: 20px;
-  box-shadow: 0 0 15px #000;
-  width: 350px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+  width: 100%;
+  max-width: 450px;
+  border: 1px solid var(--border-color);
 }
 
+h1 {
+  color: #fff;
+  font-weight: 700;
+  margin-top: 0;
+  margin-bottom: 25px;
+}
+
+h2, h3 {
+  color: var(--text-muted);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 10px;
+  margin-bottom: 15px;
+}
+
+.hidden { 
+  display: none; 
+}
+
+/* Estilo de Inputs */
+input[type="text"] {
+  width: 100%;
+  padding: 12px 15px;
+  border-radius: 8px;
+  border: 2px solid var(--border-color);
+  background-color: var(--bg-dark);
+  color: var(--text-light);
+  font-size: 16px;
+  margin: 8px 0;
+  box-sizing: border-box; /* Importante para que el padding no afecte el ancho */
+  transition: border-color 0.3s, box-shadow 0.3s;
+  text-align: center;
+}
+
+input[type="text"]::placeholder {
+  color: var(--text-muted);
+}
+
+input[type="text"]:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 10px rgba(127, 90, 240, 0.5);
+  outline: none;
+}
+
+/* Estilo de Botones */
 button {
-  background-color: #ff3b3b;
-  border: none;
-  color: white;
-  padding: 10px 20px;
+  width: 100%;
+  padding: 12px 20px;
   border-radius: 8px;
   cursor: pointer;
   margin-top: 10px;
-  transition: 0.2s;
-}
-
-button:hover {
-  background-color: #ff5555;
-  transform: scale(1.05);
-}
-
-.hidden { display: none; }
-
-input {
-  padding: 5px;
-  border-radius: 5px;
-  border: none;
-  text-align: center;
   font-size: 16px;
-  margin: 5px 0;
+  font-weight: 600;
+  font-family: "Poppins", sans-serif;
+  transition: all 0.3s ease;
+  border: none;
+  box-sizing: border-box;
 }
 
+/* Botón Primario (Crear, Iniciar, etc.) */
+.btn-primary {
+  background: linear-gradient(90deg, var(--primary), var(--primary-dark));
+  color: white;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(127, 90, 240, 0.4);
+}
+
+/* Botón Secundario (Unirse, Jugar de nuevo) */
+.btn-secondary {
+  background-color: transparent;
+  border: 2px solid var(--primary);
+  color: var(--primary);
+}
+
+.btn-secondary:hover {
+  background-color: var(--primary);
+  color: white;
+}
+
+/* Lista de Jugadores */
+#playerList {
+  list-style: none;
+  padding: 0;
+  margin: 15px 0;
+}
+
+#playerList li {
+  background-color: var(--bg-dark);
+  padding: 10px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  font-weight: 600;
+  border: 1px solid var(--border-color);
+}
+
+/* Sección de Votación */
 #voteButtons {
   display: flex;
   flex-direction: column;
   gap: 10px;
   margin-top: 15px;
+}
+
+#voteButtons button {
+  background-color: #ff3b3b; /* Mantenemos el rojo para votar */
+  color: white;
+}
+
+#voteButtons button:hover {
+  background-color: #ff5555;
+  transform: scale(1.03);
 }
