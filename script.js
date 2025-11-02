@@ -1,14 +1,15 @@
 // Config Firebase
 // ¡¡¡ RECUERDA USAR TU PROPIA CONFIGURACIÓN DE FIREBASE!!!
 const firebaseConfig = {
-  apiKey: "TU_API_KEY",
-  authDomain: "TU_AUTH_DOMAIN",
-  databaseURL: "TU_DATABASE_URL",
-  projectId: "TU_PROJECT_ID",
-  storageBucket: "TU_STORAGE_BUCKET",
-  messagingSenderId: "TU_MESSAGING_SENDER_ID",
-  appId: "TU_APP_ID"
-};
+    apiKey: "AIzaSyAlj1iNqWqtI8j9KXWsrLMpk4NBpHV6KjI",
+    authDomain: "impostor-681a4.firebaseapp.com",
+    databaseURL: "https://impostor-681a4-default-rtdb.firebaseio.com",
+    projectId: "impostor-681a4",
+    storageBucket: "impostor-681a4.firebasestorage.app",
+    messagingSenderId: "190634294699",
+    appId: "1:190634294699:web:f07b18db1e01231b2f26ee",
+    measurementId: "G-S02DGT01CQ"
+  };
 
 // Inicializar Firebase
 firebase.initializeApp(firebaseConfig);
