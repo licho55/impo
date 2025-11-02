@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>El Impostor Online</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+  <h1>🎭 El Impostor Online</h1>
+
+  <!-- Menú inicial -->
+  <div id="menu">
+    <input type="text" id="playerName" placeholder="Tu nombre">
+    <button id="createRoom">Crear sala</button>
+    <input type="text" id="roomCodeInput" placeholder="Código de sala">
+    <button id="joinRoom">Unirse</button>
+  </div>
+
+  <!-- Lobby -->
+  <div id="lobby" class="hidden">
+    <h2>Sala: <span id="roomCode"></span></h2>
+    <h3>Jugadores:</h3>
+    <ul id="playerList"></ul>
+    <button id="startGame" class="hidden">Iniciar partida</button>
+    <p id="waitingText">Esperando al host...</p>
+  </div>
+
+  <!-- Juego -->
+  <div id="game" class="hidden">
+    <h2 id="playerRole"></h2>
+    <p id="wordInfo"></p>
+    <button id="goToVote">Ir a votación</button>
+  </div>
+
+  <!-- Votación -->
+  <div id="vote" class="hidden">
+    <h2>Votación</h2>
+    <div id="voteButtons"></div>
+  </div>
+
+  <!-- Resultado -->
+  <div id="result" class="hidden">
+    <h2>Resultado</h2>
+    <p id="resultText"></p>
+    <button onclick="location.reload()">Jugar de nuevo</button>
+  </div>
+</div>
+
+<!-- Firebase global -->
+<script src="https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.5.0/firebase-database.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
